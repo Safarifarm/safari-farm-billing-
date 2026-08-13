@@ -10,6 +10,8 @@ Private, mobile-friendly billing, customer and inventory app. Data is stored in 
 4. Go to **Authentication → Users → Add user**. Create the single email/password account you will use.
 5. Do not put a secret or service-role key in this project. `config.js` contains only the browser-safe publishable key; Row Level Security protects every record by logged-in owner.
 
+For a database created by an older Safari Farm version, also run `FINAL-DATABASE-FIX.sql` once after the main migration.
+
 If your Supabase URL/key changes, edit only `config.js`.
 
 ## 2. Test locally
