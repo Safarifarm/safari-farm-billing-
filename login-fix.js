@@ -12,6 +12,7 @@ document.querySelector('#loginForm').onsubmit=async function(e){
     button.disabled=false; button.textContent='Sign in securely'; return;
   }
   S.token=session.access_token; S.user=session.user;
+  localStorage.setItem('safari_session',JSON.stringify(session));
   sessionStorage.setItem('safari_session',JSON.stringify(session));
   message.textContent='Login successful. Loading farm data…';
   try {
