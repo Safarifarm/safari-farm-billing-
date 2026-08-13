@@ -14,6 +14,7 @@ document.querySelector('#loginForm').onsubmit=async function(e){
   S.token=session.access_token; S.user=session.user;
   localStorage.setItem('safari_session',JSON.stringify(session));
   sessionStorage.setItem('safari_session',JSON.stringify(session));
+  sessionStorage.removeItem('safari_restore_attempted');
   message.textContent='Login successful. Loading farm data…';
   try {
     await load();
