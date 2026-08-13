@@ -1,3 +1,3 @@
-const CACHE='safari-farm-v3'; const ASSETS=['./','./index.html','./styles.css','./app.js','./config.js','./login-fix.js','./logo-source.png'];
+const CACHE='safari-farm-v4'; const ASSETS=['./','./index.html','./styles.css','./app.js','./config.js','./login-fix.js','./logo-source.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))));

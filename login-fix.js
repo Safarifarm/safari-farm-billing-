@@ -24,3 +24,13 @@ document.querySelector('#loginForm').onsubmit=async function(e){
     button.disabled=false; button.textContent='Sign in securely';
   }
 };
+
+// Add a complete customer directly from the invoice screen.
+const customerSelect=document.querySelector('#invoiceCustomer');
+const quickCustomerButton=document.createElement('button');
+quickCustomerButton.type='button';
+quickCustomerButton.id='quickAddCustomer';
+quickCustomerButton.textContent='＋ New Customer';
+customerSelect.insertAdjacentElement('afterend',quickCustomerButton);
+customerSelect.parentElement.classList.add('invoice-customer-label');
+quickCustomerButton.onclick=()=>editCustomer();
