@@ -14,3 +14,13 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+do $$
+declare v_table text;
+begin
+  foreach v_table in array array['invoices','invoice_items','stock_adjustments'] loop
+    if exists(select 1 from information_schema.columns c where c.table_schema='public' and c.table_name=v_table and c.column_name='user_id') then
+      execute format('alter table public.%I alter column user_id set default auth.uid()',v_table);
+    end if;
+  end loop;
+end $$;

@@ -38,6 +38,15 @@
   invoiceData=function(){const d=baseInvoiceData();d.customer=inlineCustomer();return d};
   customerBlock.querySelectorAll('input').forEach(input=>input.addEventListener('input',renderPreview));
 
+  function showCustomerEmail(){
+    const box=document.querySelector('#invoicePreview .customer-box');
+    if(!box)return;
+    box.querySelector('.customer-email-line')?.remove();
+    const phone=[...box.querySelectorAll('.detail-line')].find(x=>x.querySelector('b')?.textContent==='Phone / Mobile');
+    if(phone){const row=document.createElement('div');row.className='detail-line customer-email-line';row.innerHTML=`<b>Email</b><i>:</i><span>${esc(document.querySelector('#inlineEmail').value.trim())}</span>`;phone.insertAdjacentElement('afterend',row)}
+  }
+  new MutationObserver(showCustomerEmail).observe(document.querySelector('#invoicePreview'),{childList:true,subtree:true});
+
   form.onsubmit=async function(e){
     e.preventDefault();
     const c=inlineCustomer();
@@ -57,5 +66,5 @@
       await saveInvoice(e);
     }catch(error){toast(error.message)}
   };
-  renderPreview();
+  renderPreview();showCustomerEmail();
 })();
