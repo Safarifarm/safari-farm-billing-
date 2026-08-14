@@ -13,7 +13,7 @@ The fresh database uses only tables starting with `sf_`, so old broken tables do
 ## GitHub Pages deployment
 
 1. Delete the old files from your local GitHub repository folder.
-2. Copy only these files into the repository root: `.nojekyll`, `index.html`, `styles.css`, `app.js`, `config.js`, `logo.png`, `supabase-setup.sql`, `README.md`.
+2. Copy only these files into the repository root: `.nojekyll`, `index.html`, `styles.css`, `app.js`, `config.js`, `logo.png`, `sw.js`, `supabase-setup.sql`, `README.md`.
 3. In GitHub Desktop: commit, then **Push origin**.
 4. GitHub Settings > Pages: `main` and `/(root)`.
 5. Open `https://safarifarm.github.io/safari-farm-billing-/` in a new Incognito window.
