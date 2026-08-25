@@ -18,9 +18,11 @@
 .product-serial{width:44px;height:44px;border-radius:12px;background:#edf3e9;color:#315c3c;display:grid;place-items:center;font-weight:900}.actions .icon:disabled{opacity:.25;cursor:not-allowed}
 .line-row-actions{display:flex;align-items:center;align-self:end}.line-row-actions .icon{padding:4px}.line-row-actions .icon:disabled{opacity:.25;cursor:not-allowed}.invoice-line .line{grid-template-columns:minmax(190px,2fr) repeat(5,minmax(75px,.7fr)) 96px}
 .invoice-paper.ref-style{height:297mm!important;min-height:297mm!important;max-height:297mm!important;box-sizing:border-box!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;padding-bottom:9mm!important}
-.invoice-paper.ref-style .ref-footer{position:static!important;margin:1.5mm 0 0!important;min-height:15mm!important;z-index:3;background:#fff;flex:none}
+.invoice-paper.ref-style .ref-footer{position:absolute!important;left:4mm!important;right:4mm!important;bottom:7.5mm!important;margin:0!important;height:16mm!important;min-height:16mm!important;z-index:4;background:#fff;overflow:visible!important}
 .invoice-paper.ref-style .ref-lower{flex:none!important}
 .invoice-paper.ref-style .ref-strip{position:absolute!important;bottom:1.5mm!important}
+.invoice-paper.ref-style .ref-signature{align-self:start!important;padding-top:0!important;transform:translateY(-1mm)}
+.invoice-paper.ref-style .ref-signature em{margin:1mm 0!important;line-height:1!important}
 .invoice-paper.ref-style .page-count{bottom:4.5mm!important}
 .invoice-paper.ref-style.detailed-invoice .ref-header{height:37mm!important}
 .invoice-paper.ref-style.detailed-invoice .customer-box{padding-top:6mm!important;padding-bottom:1.5mm!important}
