@@ -83,3 +83,12 @@ The supplied policies are intentionally simple for one private business. Before 
 npm run build
 npm run preview
 ```
+
+## Final business upgrade (required once)
+
+Supabase **SQL Editor → New query** mein in files ko number order mein poora run karein:
+
+1. `supabase/migrations/013_business_payment_details.sql`
+2. `supabase/migrations/014_edit_purchase_and_sale_invoice.sql`
+
+Is upgrade ke baad Customer/Sale invoice stock ghataata hai, Self/Purchase invoice stock badhaata hai, saved invoices safely edit hote hain, aur payment method/reference/due-date cloud mein save hote hain.

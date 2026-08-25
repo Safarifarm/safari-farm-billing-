@@ -33,6 +33,8 @@ import {
   Leaf,
   CheckCircle2,
   Clock3,
+  BarChart3,
+  CreditCard,
 } from "lucide-react";
 import { supabase, hasSupabase } from "./lib/supabase";
 import {
@@ -231,6 +233,16 @@ function useStore() {
     if (supabase) {
       const { data, error } = await supabase.rpc("sfh_create_invoice", payload);
       if (error) throw error;
+      const { error: paymentError } = await supabase
+        .from("sfh_invoices")
+        .update({
+          payment_method: payload.p_invoice.payment_method,
+          payment_reference: payload.p_invoice.payment_reference,
+          payment_notes: payload.p_invoice.payment_notes,
+          due_date: payload.p_invoice.due_date,
+        })
+        .eq("id", data);
+      if (paymentError) throw paymentError;
       await load();
       return data;
     }
@@ -264,6 +276,16 @@ function useStore() {
         ...payload,
       });
       if (error) throw error;
+      const { error: paymentError } = await supabase
+        .from("sfh_invoices")
+        .update({
+          payment_method: payload.p_invoice.payment_method,
+          payment_reference: payload.p_invoice.payment_reference,
+          payment_notes: payload.p_invoice.payment_notes,
+          due_date: payload.p_invoice.due_date,
+        })
+        .eq("id", id);
+      if (paymentError) throw paymentError;
       await load();
       return data;
     }
@@ -308,6 +330,7 @@ const nav = [
   ["/products", Package, "Products"],
   ["/stock", Boxes, "Stock"],
   ["/invoices", FileText, "Invoices"],
+  ["/reports", BarChart3, "Business Reports"],
   ["/settings", Settings, "Farm Settings"],
 ];
 function InstallAppButton() {
@@ -424,9 +447,20 @@ function PageHead({ title, desc, action }) {
   );
 }
 function Dashboard({ s }) {
-  const sales = s.invoices.reduce((a, i) => a + Number(i.grand_total), 0),
-    due = s.invoices.reduce(
+  const saleInvoices = s.invoices.filter(
+      (i) => i.invoice_type !== "Purchase/Stock Invoice",
+    ),
+    purchaseInvoices = s.invoices.filter(
+      (i) => i.invoice_type === "Purchase/Stock Invoice",
+    ),
+    sales = saleInvoices.reduce((a, i) => a + Number(i.grand_total), 0),
+    purchases = purchaseInvoices.reduce((a, i) => a + Number(i.grand_total), 0),
+    due = saleInvoices.reduce(
       (a, i) => a + Number(i.grand_total - i.amount_paid),
+      0,
+    ),
+    stockValue = s.products.reduce(
+      (a, p) => a + Number(p.current_stock) * Number(p.purchase_price),
       0,
     ),
     low = s.products.filter(
@@ -443,7 +477,7 @@ function Dashboard({ s }) {
           icon={IndianRupee}
           label="Total sales"
           value={money(sales)}
-          note="All invoices"
+          note={`${saleInvoices.length} customer invoices`}
           tone="green"
         />
         <Stat
@@ -455,11 +489,9 @@ function Dashboard({ s }) {
         />
         <Stat
           icon={Boxes}
-          label="Stock items"
-          value={s.products
-            .reduce((a, p) => a + Number(p.current_stock), 0)
-            .toLocaleString("en-IN")}
-          note={`${s.products.length} products`}
+          label="Stock value"
+          value={money(stockValue)}
+          note={`${s.products.length} products · Purchase ${money(purchases)}`}
           tone="blue"
         />
         <Stat
@@ -504,6 +536,148 @@ function Dashboard({ s }) {
             ))
           ) : (
             <Empty text="All products have healthy stock." />
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+function Reports({ s }) {
+  const sales = s.invoices.filter(
+      (i) => i.invoice_type !== "Purchase/Stock Invoice",
+    ),
+    purchases = s.invoices.filter(
+      (i) => i.invoice_type === "Purchase/Stock Invoice",
+    ),
+    saleTotal = sales.reduce((a, i) => a + Number(i.subtotal || 0), 0),
+    purchaseTotal = purchases.reduce((a, i) => a + Number(i.subtotal || 0), 0),
+    dueTotal = sales.reduce(
+      (a, i) => a + Math.max(0, Number(i.grand_total) - Number(i.amount_paid)),
+      0,
+    ),
+    stockCost = s.products.reduce(
+      (a, p) => a + Number(p.current_stock) * Number(p.purchase_price),
+      0,
+    ),
+    stockSale = s.products.reduce(
+      (a, p) => a + Number(p.current_stock) * Number(p.sale_price),
+      0,
+    ),
+    expectedProfit = stockSale - stockCost;
+  return (
+    <>
+      <PageHead
+        title="Business reports"
+        desc="Sales, purchases, stock valuation, dues and expected profit in one place."
+      />
+      <div className="stats report-stats">
+        <Stat
+          icon={TrendingUp}
+          label="Customer sales"
+          value={money(saleTotal)}
+          note={`${sales.length} sale invoices`}
+          tone="green"
+        />
+        <Stat
+          icon={Boxes}
+          label="Purchases"
+          value={money(purchaseTotal)}
+          note={`${purchases.length} self/stock invoices`}
+          tone="blue"
+        />
+        <Stat
+          icon={Clock3}
+          label="Customer due"
+          value={money(dueTotal)}
+          note="Pending collection"
+          tone="amber"
+        />
+        <Stat
+          icon={IndianRupee}
+          label="Expected stock profit"
+          value={money(expectedProfit)}
+          note={`Stock cost ${money(stockCost)}`}
+          tone="green"
+        />
+      </div>
+      <div className="grid2 reports-grid">
+        <div className="card">
+          <div className="cardhead">
+            <div>
+              <h3>Stock valuation</h3>
+              <p>Buy cost, sale value and profit product-wise</p>
+            </div>
+          </div>
+          <div className="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Stock</th>
+                  <th>Buy value</th>
+                  <th>Sale value</th>
+                  <th>Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.products.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <b>{p.name}</b>
+                      <small>{p.sku}</small>
+                    </td>
+                    <td>
+                      {p.current_stock} {p.unit}
+                    </td>
+                    <td>
+                      {money(
+                        Number(p.current_stock) * Number(p.purchase_price),
+                      )}
+                    </td>
+                    <td>
+                      {money(Number(p.current_stock) * Number(p.sale_price))}
+                    </td>
+                    <td>
+                      <b>
+                        {money(
+                          Number(p.current_stock) *
+                            (Number(p.sale_price) - Number(p.purchase_price)),
+                        )}
+                      </b>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card">
+          <div className="cardhead">
+            <div>
+              <h3>Payment summary</h3>
+              <p>Paid, partial and unpaid customer invoices</p>
+            </div>
+          </div>
+          {sales.length ? (
+            sales.slice(0, 10).map((i) => (
+              <div className="payment-summary" key={i.id}>
+                <div>
+                  <b>{i.customer?.name || "Customer"}</b>
+                  <small>
+                    {i.invoice_no} ·{" "}
+                    {i.payment_method || "Payment not recorded"}
+                  </small>
+                </div>
+                <div>
+                  <strong>{money(i.amount_paid)}</strong>
+                  <small>
+                    Due {money(Math.max(0, i.grand_total - i.amount_paid))}
+                  </small>
+                </div>
+              </div>
+            ))
+          ) : (
+            <Empty text="No customer invoices yet." />
           )}
         </div>
       </div>
@@ -697,6 +871,20 @@ function Products({ s }) {
                 <b>{money(p.sale_price)}</b>
               </span>
               <span>
+                <small>Profit / Unit</small>
+                <b className="profit-value">
+                  {money(Number(p.sale_price) - Number(p.purchase_price))}
+                </b>
+              </span>
+              <span>
+                <small>Profit Margin</small>
+                <b>
+                  {Number(p.sale_price) > 0
+                    ? `${(((Number(p.sale_price) - Number(p.purchase_price)) / Number(p.sale_price)) * 100).toFixed(1)}%`
+                    : "0%"}
+                </b>
+              </span>
+              <span>
                 <small>Wholesale Price</small>
                 <b>{money(p.discount_price)}</b>
               </span>
@@ -716,6 +904,12 @@ function Products({ s }) {
                   }
                 >
                   {p.current_stock} {p.unit}
+                </b>
+              </span>
+              <span>
+                <small>Minimum Stock Limit</small>
+                <b>
+                  {p.low_stock_threshold} {p.unit}
                 </b>
               </span>
             </div>
@@ -899,7 +1093,7 @@ function NewInvoice({ s }) {
     },
   ];
   const [invoiceType, setInvoiceType] = useState(
-      existing?.invoice_type || "Proforma Invoice",
+      existing?.invoice_type || "Tax Invoice",
     ),
     [pricingMode, setPricingMode] = useState(
       existing?.pricing_mode || "Simple Selling",
@@ -917,6 +1111,14 @@ function NewInvoice({ s }) {
     );
   const [items, setItems] = useState(initialItems),
     [paid, setPaid] = useState(existing?.amount_paid || 0),
+    [paymentMethod, setPaymentMethod] = useState(
+      existing?.payment_method || "Cash",
+    ),
+    [paymentReference, setPaymentReference] = useState(
+      existing?.payment_reference || "",
+    ),
+    [paymentNotes, setPaymentNotes] = useState(existing?.payment_notes || ""),
+    [dueDate, setDueDate] = useState(existing?.due_date || today()),
     [date, setDate] = useState(existing?.invoice_date || today()),
     [busy, setBusy] = useState(false),
     [newCustomer, setNewCustomer] = useState(false),
@@ -938,7 +1140,9 @@ function NewInvoice({ s }) {
       purchase_rate = Number(
         i.mode === "manual"
           ? i.purchase_rate
-          : (isPurchase ? i.purchase_rate : p?.purchase_price) || 0,
+          : (isPurchase
+              ? (i.purchase_rate ?? p?.purchase_price)
+              : p?.purchase_price) || 0,
       ),
       stand_rate = Number(
         i.mode === "manual" ? i.stand_rate : p?.extra_price || 0,
@@ -1019,6 +1223,10 @@ function NewInvoice({ s }) {
     tax_total: tax,
     grand_total: grand,
     amount_paid: Number(paid),
+    payment_method: paymentMethod,
+    payment_reference: paymentReference,
+    payment_notes: paymentNotes,
+    due_date: dueDate,
     payment_status:
       Number(paid) >= grand ? "Paid" : Number(paid) > 0 ? "Partial" : "Unpaid",
     notes: s.settings.notes,
@@ -1059,6 +1267,10 @@ function NewInvoice({ s }) {
           tax_total: tax,
           grand_total: grand,
           amount_paid: Number(paid),
+          payment_method: paymentMethod,
+          payment_reference: paymentReference,
+          payment_notes: paymentNotes,
+          due_date: dueDate,
           payment_status,
           notes: s.settings.notes,
         },
@@ -1114,19 +1326,13 @@ function NewInvoice({ s }) {
       <div className="invoice-builder">
         <div className="invoice-form">
           <div className="card formcard">
-            <h3>3 Invoice systems</h3>
-            <div className="invoice-type-tabs three-tabs">
-              <button
-                className={invoiceType === "Proforma Invoice" ? "active" : ""}
-                onClick={() => setInvoiceType("Proforma Invoice")}
-              >
-                <FileText /> Proforma Sale
-              </button>
+            <h3>2 Business invoice systems</h3>
+            <div className="invoice-type-tabs two-business-tabs">
               <button
                 className={invoiceType === "Tax Invoice" ? "active" : ""}
                 onClick={() => setInvoiceType("Tax Invoice")}
               >
-                <IndianRupee /> Tax Sale
+                <IndianRupee /> Customer / Sale Invoice
               </button>
               <button
                 className={
@@ -1141,8 +1347,8 @@ function NewInvoice({ s }) {
               </button>
             </div>
             <p className="hint">
-              Sale invoice stock ghataata hai. Purchase / Stock invoice stock
-              badhaata hai aur buy-versus-sell profit dikhata hai.
+              Customer invoice stock ghataata hai. Self / Purchase invoice stock
+              badhaata hai aur actual buy cost record karta hai.
             </p>
           </div>
           <div className="card formcard">
@@ -1553,15 +1759,57 @@ function NewInvoice({ s }) {
           </div>
           <div className="form-bottom">
             <div className="card formcard">
-              <h3>Payment</h3>
-              <Field label="Amount received">
-                <input
-                  type="number"
-                  min="0"
-                  value={paid}
-                  onChange={(e) => setPaid(e.target.value)}
-                />
-              </Field>
+              <h3>
+                <CreditCard /> Complete payment details
+              </h3>
+              <div className="payment-form-grid">
+                <Field
+                  label={
+                    isPurchase ? "Amount paid to supplier" : "Amount received"
+                  }
+                >
+                  <input
+                    type="number"
+                    min="0"
+                    value={paid}
+                    onChange={(e) => setPaid(e.target.value)}
+                  />
+                </Field>
+                <Field label="Payment method">
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option>Cash</option>
+                    <option>UPI</option>
+                    <option>Bank Transfer</option>
+                    <option>Cheque</option>
+                    <option>Card</option>
+                    <option>Credit / Due</option>
+                  </select>
+                </Field>
+                <Field label="Transaction / Cheque reference">
+                  <input
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="Optional reference number"
+                  />
+                </Field>
+                <Field label="Due date">
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </Field>
+                <Field label="Payment notes">
+                  <input
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Advance, balance, payment terms..."
+                  />
+                </Field>
+              </div>
               <p className="hint">
                 Status:{" "}
                 <Badge
@@ -2003,6 +2251,28 @@ function InvoicePaper({
             <span>Branch</span>
             <b>: {f.branch || "—"}</b>
           </p>
+          <div className="invoice-payment-box">
+            <p>
+              <span>Payment</span>
+              <b>: {inv.payment_method || "Cash"}</b>
+            </p>
+            <p>
+              <span>Reference</span>
+              <b>: {inv.payment_reference || "—"}</b>
+            </p>
+            <p>
+              <span>Paid / Due</span>
+              <b>
+                : {money(inv.amount_paid)} /{" "}
+                {money(
+                  Math.max(
+                    0,
+                    Number(inv.grand_total) - Number(inv.amount_paid),
+                  ),
+                )}
+              </b>
+            </p>
+          </div>
         </div>
         <div className="inv-totals ref-totals">
           {inv.pricing_mode === "Detailed Pricing" && (
@@ -2463,6 +2733,7 @@ function ProtectedApp() {
           <Route path="/invoices/new" element={<NewInvoice s={s} />} />
           <Route path="/invoices/:id/edit" element={<NewInvoice s={s} />} />
           <Route path="/invoices/:id" element={<InvoiceView s={s} />} />
+          <Route path="/reports" element={<Reports s={s} />} />
           <Route path="/settings" element={<SettingsPage s={s} />} />
         </Routes>
       )}
