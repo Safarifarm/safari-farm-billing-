@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92" fill="#173d2d"/>
+  <rect x="34" y="34" width="444" height="444" rx="72" fill="#ffffff"/>
+  <image href="/safari-logo.png" x="116" y="40" width="280" height="420" preserveAspectRatio="xMidYMid slice"/>
+</svg>
