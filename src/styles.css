@@ -23,6 +23,18 @@
 .invoice-paper.ref-style .ref-strip{position:absolute!important;bottom:1.5mm!important}
 .invoice-paper.ref-style .ref-signature{align-self:start!important;padding-top:0!important;transform:translateY(-1mm)}
 .invoice-paper.ref-style .ref-signature em{margin:1mm 0!important;line-height:1!important}
+.invoice-paper.ref-style .ref-header{height:37mm!important}
+.invoice-paper.ref-style .ref-company{padding-top:4mm!important}
+.invoice-paper.ref-style .ref-numbers div{padding:1.25mm 1mm!important}
+.invoice-paper.ref-style .customer-box{padding-top:5.8mm!important;padding-bottom:1.2mm!important;margin-top:1.5mm!important;margin-bottom:1.5mm!important}
+.invoice-paper.ref-style .checks{margin-bottom:1mm!important}
+.invoice-paper.ref-style .customer-lines p{margin:.35mm 0!important;line-height:1.08!important}
+.invoice-paper.ref-style .ref-table th{height:5mm!important;padding:.7mm!important}
+.invoice-paper.ref-style .ref-table td{height:4.75mm!important;padding:.45mm .8mm!important}
+.invoice-paper.ref-style .ref-lower{margin-top:2.5mm!important;max-height:43mm!important}
+.invoice-paper.ref-style .ref-bank p{margin:1.1mm 0!important;line-height:1.05!important}
+.invoice-paper.ref-style .ref-totals p{padding:1.05mm 2mm!important;line-height:1.05!important}
+.invoice-paper.ref-style .words{padding:1.2mm 2mm!important;line-height:1.05!important}
 .invoice-paper.ref-style .page-count{bottom:4.5mm!important}
 .invoice-paper.ref-style.detailed-invoice .ref-header{height:37mm!important}
 .invoice-paper.ref-style.detailed-invoice .customer-box{padding-top:6mm!important;padding-bottom:1.5mm!important}
