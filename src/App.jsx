@@ -76,6 +76,8 @@ const parseSupplierInvoiceText = (rawText) => {
     dateMatch = text.match(
       /(?:date)?\s*[:.-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
     ),
+    gstinMatch = text.match(/\b\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]\b/i),
+    phoneMatch = text.match(/(?:\+?91[-\s]?)?\b([6-9]\d{9})\b/),
     supplier =
       lines.find(
         (x) =>
@@ -94,24 +96,33 @@ const parseSupplierInvoiceText = (rawText) => {
       )
         return null;
       const amount = nums.at(-1),
-        rate = nums.at(-2),
-        qty =
-          nums.length >= 3
+        hasGstColumn = /%/.test(line) && nums.length >= 4,
+        gstRate = hasGstColumn ? nums.at(-2) : 0,
+        rate = hasGstColumn ? nums.at(-3) : nums.at(-2),
+        qty = hasGstColumn
+          ? nums.at(-4)
+          : nums.length >= 3
             ? nums.at(-3)
-            : Math.max(1, Math.round(amount / Math.max(rate, 1)));
+            : Math.max(1, Math.round(amount / Math.max(rate, 1))),
+        expectedAmount = qty * rate,
+        amountLooksValid =
+          expectedAmount > 0 &&
+          Math.abs(amount - expectedAmount) <=
+            Math.max(expectedAmount * 0.35, 2);
       const name = line
         .replace(/(?:₹|Rs\.?\s*)?[0-9][0-9,]*(?:\.\d{1,2})?/gi, " ")
         .replace(/\s+/g, " ")
         .replace(/^[-.: ]+|[-.: ]+$/g, "")
         .slice(0, 90);
-      return name && qty > 0 && rate >= 0
+      return name && qty > 0 && rate >= 0 && amountLooksValid
         ? {
             id: uid(),
             name,
             quantity: qty,
             buy_price: rate,
             sale_price: Number((rate * 1.2).toFixed(2)),
-            gst_rate: 0,
+            gst_rate: gstRate,
+            hsn: "",
             unit: "Nos",
             product_id: "",
             create_new: true,
@@ -124,6 +135,8 @@ const parseSupplierInvoiceText = (rawText) => {
     supplier,
     invoice_no: invoiceMatch?.[1] || "",
     invoice_date: normaliseInvoiceDate(dateMatch?.[1]),
+    gstin: gstinMatch?.[0]?.toUpperCase() || "",
+    phone: phoneMatch?.[1] || "",
     rows: rows.length
       ? rows
       : [
@@ -158,28 +171,62 @@ const readSupplierInvoice = async (file, onProgress) => {
       data: new Uint8Array(await file.arrayBuffer()),
     }).promise;
     let text = "";
-    for (let n = 1; n <= Math.min(pdf.numPages, 5); n++) {
-      onProgress(
-        `PDF page ${n} of ${Math.min(pdf.numPages, 5)} read ho raha hai…`,
-      );
+    const pages = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      onProgress(`PDF page ${n} of ${pdf.numPages} read ho raha hai…`);
       const page = await pdf.getPage(n),
         content = await page.getTextContent();
-      text += content.items.map((x) => x.str).join(" ") + "\n";
+      pages.push(page);
+      const rows = new Map();
+      content.items.forEach((item) => {
+        const y = Math.round(item.transform?.[5] || 0),
+          key = [...rows.keys()].find((known) => Math.abs(known - y) <= 2) ?? y;
+        rows.set(key, `${rows.get(key) || ""} ${item.str}`.trim());
+      });
+      text +=
+        [...rows.entries()]
+          .sort((a, b) => b[0] - a[0])
+          .map((x) => x[1])
+          .join("\n") + "\n";
     }
-    if (text.replace(/\s/g, "").length > 80)
-      return parseSupplierInvoiceText(text);
-    throw new Error(
-      "Ye scanned PDF hai. Iske page ka clear photo/JPG upload karein.",
-    );
+    const parsedTextPdf = parseSupplierInvoiceText(text);
+    if (parsedTextPdf.rows.some((row) => row.name.trim())) return parsedTextPdf;
+    const { createWorker } = await import("tesseract.js"),
+      worker = await createWorker("eng", 1, {
+        logger: (m) =>
+          m.status === "recognizing text" &&
+          onProgress(`PDF scan ${Math.round((m.progress || 0) * 100)}%`),
+      });
+    try {
+      for (let n = 0; n < pages.length; n++) {
+        onProgress(`Scanned PDF page ${n + 1} of ${pages.length} OCR…`);
+        const viewport = pages[n].getViewport({ scale: 2 }),
+          canvas = document.createElement("canvas"),
+          context = canvas.getContext("2d", { willReadFrequently: true });
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        await pages[n].render({ canvasContext: context, viewport }).promise;
+        const result = await worker.recognize(canvas);
+        text += `${result.data.text}\n`;
+      }
+    } finally {
+      await worker.terminate();
+    }
+    return parseSupplierInvoiceText(text);
   }
   onProgress("Photo se text read ho raha hai—thoda samay lagega…");
-  const { recognize } = await import("tesseract.js"),
-    result = await recognize(file, "eng", {
+  const { createWorker } = await import("tesseract.js"),
+    worker = await createWorker("eng", 1, {
       logger: (m) =>
         m.status === "recognizing text" &&
         onProgress(`Reading ${Math.round((m.progress || 0) * 100)}%`),
     });
-  return parseSupplierInvoiceText(result.data.text);
+  try {
+    const result = await worker.recognize(file);
+    return parseSupplierInvoiceText(result.data.text);
+  } finally {
+    await worker.terminate();
+  }
 };
 
 function useStore() {
@@ -1151,7 +1198,35 @@ function PurchaseInvoiceScan({ s }) {
         throw new Error("Pehle supplier invoice photo ya PDF select karein.");
       setBusy(true);
       setProgress("Starting…");
-      setScan(await readSupplierInvoice(file, setProgress));
+      const result = await readSupplierInvoice(file, setProgress),
+        normal = (value) =>
+          String(value || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ""),
+        rows = result.rows.map((row) => {
+          const rowName = normal(row.name),
+            match = s.products.find((product) => {
+              const productName = normal(product.name);
+              return (
+                rowName &&
+                productName &&
+                (rowName === productName ||
+                  rowName.includes(productName) ||
+                  productName.includes(rowName))
+              );
+            });
+          return match
+            ? {
+                ...row,
+                product_id: match.id,
+                name: match.name,
+                hsn: match.hsn || row.hsn || "",
+                unit: match.unit || row.unit || "Nos",
+                sale_price: match.sale_price || row.sale_price,
+              }
+            : row;
+        });
+      setScan({ ...result, rows });
     } catch (e) {
       alert(e.message);
     } finally {
@@ -1325,7 +1400,7 @@ function PurchaseInvoiceScan({ s }) {
           <label className="invoice-drop">
             <Upload />
             <b>{file?.name || "Choose supplier invoice"}</b>
-            <small>PDF/JPG/PNG · maximum 5 pages read honge</small>
+            <small>PDF/JPG/PNG · scanned multi-page PDF bhi read hoga</small>
             <input
               type="file"
               accept="application/pdf,image/*"
@@ -1468,6 +1543,22 @@ function PurchaseInvoiceScan({ s }) {
                       }
                     />
                   </Field>
+                  <Field label="HSN / SAC">
+                    <input
+                      value={row.hsn || ""}
+                      onChange={(e) =>
+                        updateRow(row.id, { hsn: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Unit">
+                    <input
+                      value={row.unit || "Nos"}
+                      onChange={(e) =>
+                        updateRow(row.id, { unit: e.target.value })
+                      }
+                    />
+                  </Field>
                   <button
                     className="icon danger"
                     title="Remove"
@@ -1498,6 +1589,7 @@ function PurchaseInvoiceScan({ s }) {
                         buy_price: 0,
                         sale_price: 0,
                         gst_rate: 0,
+                        hsn: "",
                         unit: "Nos",
                         product_id: "",
                         create_new: true,
