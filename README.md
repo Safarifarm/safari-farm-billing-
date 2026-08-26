@@ -90,5 +90,16 @@ Supabase **SQL Editor → New query** mein in files ko number order mein poora r
 
 1. `supabase/migrations/013_business_payment_details.sql`
 2. `supabase/migrations/014_edit_purchase_and_sale_invoice.sql`
+3. `supabase/migrations/015_supplier_invoice_scan.sql`
 
 Is upgrade ke baad Customer/Sale invoice stock ghataata hai, Self/Purchase invoice stock badhaata hai, saved invoices safely edit hote hain, aur payment method/reference/due-date cloud mein save hote hain.
+
+## Supplier bill se automatic stock
+
+1. Sidebar mein **Invoice Scan** kholein.
+2. Supplier ka clear PDF, JPG ya PNG upload karke **Read invoice** dabayein.
+3. Supplier, invoice number, product names, quantity, buy price aur suggested sale price check/edit karein.
+4. Har row ko existing product se match karein, ya **Create new product** rehne dein.
+5. **Confirm & Add Stock** dabayein. App Purchase/Stock Invoice save karke stock badha dega aur original bill ko archive karega.
+
+OCR hamesha 100% exact nahi hota. Confirm karne se pehle quantity aur price zaroor check karein. Text-based PDF seedha read hota hai; scanned PDF ke liye clear JPG/PNG photo sabse reliable hai.

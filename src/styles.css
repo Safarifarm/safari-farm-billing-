@@ -1845,6 +1845,114 @@ td small {
 .invoice-payment-box p {
   font-size: 6.8px !important;
 }
+.scan-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.upload-card {
+  padding: 24px;
+  position: sticky;
+  top: 94px;
+}
+.upload-card h3 {
+  margin: 14px 0 5px;
+}
+.upload-card > p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+.scan-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: #eaf3e7;
+  color: var(--green);
+}
+.scan-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.invoice-drop {
+  border: 2px dashed #9cb5a3;
+  border-radius: 13px;
+  padding: 24px 14px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 7px;
+  background: #fbfdfb;
+  cursor: pointer;
+}
+.invoice-drop:hover {
+  background: #f2f8f0;
+  border-color: #517d5b;
+}
+.invoice-drop input {
+  display: none;
+}
+.invoice-drop b {
+  font-size: 13px;
+}
+.invoice-drop small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.scan-safety {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #785c12;
+  font-size: 11px;
+}
+.scan-review {
+  min-width: 0;
+}
+.scan-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 18px;
+}
+.scan-rows {
+  display: grid;
+  gap: 9px;
+  padding: 0 18px 18px;
+}
+.scan-row {
+  display: grid;
+  grid-template-columns:
+    30px minmax(180px, 1.6fr) minmax(150px, 1.4fr)
+    75px 95px 95px 70px 35px;
+  gap: 8px;
+  align-items: end;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fafcfa;
+}
+.scan-row > strong {
+  align-self: center;
+  text-align: center;
+}
+.scan-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-top: 1px solid var(--line);
+}
+.badge.review {
+  color: #765b12;
+  background: #fff2c8;
+}
 .invoice-paper.ref-style .ref-strip {
   z-index: 4;
 }
@@ -2175,6 +2283,28 @@ td small {
   }
   .payment-form-grid .field:last-child {
     grid-column: auto;
+  }
+  .scan-layout {
+    grid-template-columns: 1fr;
+  }
+  .upload-card {
+    position: static;
+  }
+  .scan-meta {
+    grid-template-columns: 1fr 1fr;
+  }
+  .scan-row {
+    grid-template-columns: 28px 1fr 1fr;
+  }
+  .scan-row .field:nth-of-type(1),
+  .scan-row .field:nth-of-type(2) {
+    grid-column: span 2;
+  }
+  .scan-actions {
+    flex-direction: column;
+  }
+  .scan-actions .btn {
+    width: 100%;
   }
 }
 @media print {

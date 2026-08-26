@@ -35,6 +35,9 @@ import {
   Clock3,
   BarChart3,
   CreditCard,
+  Upload,
+  ScanLine,
+  FileSearch,
 } from "lucide-react";
 import { supabase, hasSupabase } from "./lib/supabase";
 import {
@@ -52,6 +55,132 @@ const money = (n) =>
   }).format(Number(n || 0));
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2);
+const normaliseInvoiceDate = (value) => {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const match = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!match) return today();
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${year}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+};
+
+const parseSupplierInvoiceText = (rawText) => {
+  const text = String(rawText || "").replace(/\r/g, ""),
+    lines = text
+      .split("\n")
+      .map((x) => x.replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+    invoiceMatch = text.match(
+      /(?:invoice|bill)\s*(?:no|number|#)?\s*[:.-]?\s*([A-Z0-9\/-]{3,})/i,
+    ),
+    dateMatch = text.match(
+      /(?:date)?\s*[:.-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+    ),
+    supplier =
+      lines.find(
+        (x) =>
+          /[A-Za-z]{4}/.test(x) &&
+          !/tax invoice|invoice|gstin|phone|mobile/i.test(x),
+      ) || "Supplier";
+  const rows = lines
+    .map((line) => {
+      const nums = [
+        ...line.matchAll(/(?:₹|Rs\.?\s*)?([0-9][0-9,]*(?:\.\d{1,2})?)/gi),
+      ].map((m) => Number(m[1].replace(/,/g, "")));
+      if (
+        nums.length < 2 ||
+        !/[A-Za-z]{3}/.test(line) ||
+        /subtotal|total|tax|gst|invoice|phone|mobile|account|bank/i.test(line)
+      )
+        return null;
+      const amount = nums.at(-1),
+        rate = nums.at(-2),
+        qty =
+          nums.length >= 3
+            ? nums.at(-3)
+            : Math.max(1, Math.round(amount / Math.max(rate, 1)));
+      const name = line
+        .replace(/(?:₹|Rs\.?\s*)?[0-9][0-9,]*(?:\.\d{1,2})?/gi, " ")
+        .replace(/\s+/g, " ")
+        .replace(/^[-.: ]+|[-.: ]+$/g, "")
+        .slice(0, 90);
+      return name && qty > 0 && rate >= 0
+        ? {
+            id: uid(),
+            name,
+            quantity: qty,
+            buy_price: rate,
+            sale_price: Number((rate * 1.2).toFixed(2)),
+            gst_rate: 0,
+            unit: "Nos",
+            product_id: "",
+            create_new: true,
+          }
+        : null;
+    })
+    .filter(Boolean)
+    .slice(0, 40);
+  return {
+    supplier,
+    invoice_no: invoiceMatch?.[1] || "",
+    invoice_date: normaliseInvoiceDate(dateMatch?.[1]),
+    rows: rows.length
+      ? rows
+      : [
+          {
+            id: uid(),
+            name: "",
+            quantity: 1,
+            buy_price: 0,
+            sale_price: 0,
+            gst_rate: 0,
+            unit: "Nos",
+            product_id: "",
+            create_new: true,
+          },
+        ],
+    raw_text: text,
+  };
+};
+
+const readSupplierInvoice = async (file, onProgress) => {
+  onProgress("Invoice file taiyar ho rahi hai…");
+  if (
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf")
+  ) {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs"),
+      workerUrl = (
+        await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")
+      ).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    const pdf = await pdfjs.getDocument({
+      data: new Uint8Array(await file.arrayBuffer()),
+    }).promise;
+    let text = "";
+    for (let n = 1; n <= Math.min(pdf.numPages, 5); n++) {
+      onProgress(
+        `PDF page ${n} of ${Math.min(pdf.numPages, 5)} read ho raha hai…`,
+      );
+      const page = await pdf.getPage(n),
+        content = await page.getTextContent();
+      text += content.items.map((x) => x.str).join(" ") + "\n";
+    }
+    if (text.replace(/\s/g, "").length > 80)
+      return parseSupplierInvoiceText(text);
+    throw new Error(
+      "Ye scanned PDF hai. Iske page ka clear photo/JPG upload karein.",
+    );
+  }
+  onProgress("Photo se text read ho raha hai—thoda samay lagega…");
+  const { recognize } = await import("tesseract.js"),
+    result = await recognize(file, "eng", {
+      logger: (m) =>
+        m.status === "recognizing text" &&
+        onProgress(`Reading ${Math.round((m.progress || 0) * 100)}%`),
+    });
+  return parseSupplierInvoiceText(result.data.text);
+};
 
 function useStore() {
   const [customers, setCustomers] = useState(demoCustomers),
@@ -329,6 +458,7 @@ const nav = [
   ["/customers", Users, "Customers"],
   ["/products", Package, "Products"],
   ["/stock", Boxes, "Stock"],
+  ["/purchase-scan", ScanLine, "Invoice Scan"],
   ["/invoices", FileText, "Invoices"],
   ["/reports", BarChart3, "Business Reports"],
   ["/settings", Settings, "Farm Settings"],
@@ -1004,6 +1134,392 @@ function Stock({ s }) {
     </>
   );
 }
+function PurchaseInvoiceScan({ s }) {
+  const navg = useNavigate(),
+    [file, setFile] = useState(null),
+    [scan, setScan] = useState(null),
+    [progress, setProgress] = useState(""),
+    [busy, setBusy] = useState(false);
+  const updateRow = (id, changes) =>
+    setScan((x) => ({
+      ...x,
+      rows: x.rows.map((r) => (r.id === id ? { ...r, ...changes } : r)),
+    }));
+  const scanFile = async () => {
+    try {
+      if (!file)
+        throw new Error("Pehle supplier invoice photo ya PDF select karein.");
+      setBusy(true);
+      setProgress("Starting…");
+      setScan(await readSupplierInvoice(file, setProgress));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+      setProgress("");
+    }
+  };
+  const confirm = async () => {
+    try {
+      if (!scan?.supplier.trim()) throw new Error("Supplier name likhein.");
+      if (
+        !scan.rows.length ||
+        scan.rows.some(
+          (r) =>
+            !r.name.trim() ||
+            Number(r.quantity) <= 0 ||
+            Number(r.buy_price) < 0,
+        )
+      )
+        throw new Error(
+          "Har product ka name, quantity aur buy price check karein.",
+        );
+      setBusy(true);
+      setProgress("Products match ho rahe hain…");
+      const finalRows = [];
+      for (const row of scan.rows) {
+        let product = s.products.find((p) => p.id === row.product_id);
+        if (!product) {
+          product = await s.saveProduct({
+            name: row.name.trim(),
+            sku: `SCAN-${Date.now().toString().slice(-7)}-${finalRows.length + 1}`,
+            hsn: row.hsn || "",
+            unit: row.unit || "Nos",
+            purchase_price: Number(row.buy_price),
+            sale_price: Number(row.sale_price || row.buy_price),
+            extra_price: 0,
+            discount_price: 0,
+            without_stand_price: 0,
+            gst_rate: Number(row.gst_rate || 0),
+            current_stock: 0,
+            low_stock_threshold: Number(row.low_stock_threshold || 5),
+            active: true,
+          });
+        } else {
+          product = await s.saveProduct({
+            ...product,
+            purchase_price: Number(row.buy_price),
+            sale_price: Number(row.sale_price || row.buy_price),
+            gst_rate: Number(row.gst_rate || 0),
+          });
+        }
+        const qty = Number(row.quantity),
+          buy = Number(row.buy_price),
+          sale = Number(row.sale_price || buy),
+          gst = Number(row.gst_rate || 0),
+          base = qty * buy,
+          tax = (base * gst) / 100;
+        finalRows.push({
+          product_id: product.id,
+          image_url: product.image_url || "",
+          description: product.name,
+          hsn: product.hsn || row.hsn || "",
+          quantity: qty,
+          unit: product.unit || row.unit || "Nos",
+          purchase_rate: buy,
+          stand_rate: 0,
+          selling_rate: sale,
+          discount_rate: 0,
+          without_stand_rate: 0,
+          profit_line_total: qty * (sale - buy),
+          extra_rate: 0,
+          rate: buy,
+          discount: 0,
+          gst_rate: gst,
+          tax_amount: tax,
+          buy_line_total: base,
+          stand_line_total: 0,
+          selling_line_total: qty * sale,
+          discount_line_total: 0,
+          without_stand_line_total: 0,
+          extra_line_total: 0,
+          line_total: base + tax,
+        });
+      }
+      const subtotal = finalRows.reduce((a, r) => a + r.buy_line_total, 0),
+        taxTotal = finalRows.reduce((a, r) => a + r.tax_amount, 0),
+        sellingTotal = finalRows.reduce((a, r) => a + r.selling_line_total, 0);
+      setProgress("Purchase invoice aur stock save ho raha hai…");
+      const invoiceId = await s.createInvoice({
+        p_invoice: {
+          invoice_type: "Purchase/Stock Invoice",
+          pricing_mode: "Detailed Pricing",
+          customer_id: null,
+          customer_snapshot: {
+            name: scan.supplier,
+            customer_type: scan.gstin ? "GST" : "Non-GST",
+            phone: scan.phone || "",
+            email: "",
+            gstin: scan.gstin || "",
+            address: scan.address || "",
+            district_city: "",
+            state: "",
+            state_code: "",
+            pincode: "",
+          },
+          invoice_date: normaliseInvoiceDate(scan.invoice_date),
+          buy_total: subtotal,
+          stand_total: 0,
+          selling_total: sellingTotal,
+          discount_total: 0,
+          without_stand_total: 0,
+          profit_total: sellingTotal - subtotal,
+          subtotal,
+          tax_total: taxTotal,
+          grand_total: subtotal + taxTotal,
+          amount_paid: 0,
+          payment_status: "Unpaid",
+          payment_method: "Credit / Due",
+          payment_reference: scan.invoice_no || "Uploaded supplier invoice",
+          payment_notes: `Auto imported from ${file.name}`,
+          due_date: normaliseInvoiceDate(scan.invoice_date),
+          notes:
+            "Supplier invoice uploaded and reviewed before stock addition.",
+        },
+        p_items: finalRows,
+      });
+      try {
+        const ext = file.name.split(".").pop() || "file",
+          path = `${Date.now()}-${uid()}.${ext}`;
+        const uploaded = await supabase.storage
+          .from("supplier-invoices")
+          .upload(path, file);
+        if (uploaded.error) throw uploaded.error;
+        const { error: archiveError } = await supabase
+          .from("sfh_purchase_uploads")
+          .insert({
+            invoice_id: invoiceId,
+            supplier_name: scan.supplier,
+            supplier_invoice_no: scan.invoice_no || null,
+            supplier_invoice_date: normaliseInvoiceDate(scan.invoice_date),
+            file_url: path,
+            original_file_name: file.name,
+            extracted_text: scan.raw_text || "",
+            extraction_json: scan,
+          });
+        if (archiveError) throw archiveError;
+      } catch (archiveError) {
+        console.warn("Purchase file archive skipped", archiveError);
+      }
+      navg(`/invoices/${invoiceId}`);
+    } catch (e) {
+      alert(`Stock add nahi hua: ${e.message}`);
+    } finally {
+      setBusy(false);
+      setProgress("");
+    }
+  };
+  return (
+    <>
+      <PageHead
+        title="Supplier invoice scan"
+        desc="Supplier ka PDF/photo upload karein, details check karein, phir ek click mein stock add karein."
+      />
+      <div className="scan-layout">
+        <div className="card upload-card">
+          <div className="scan-icon">
+            <FileSearch />
+          </div>
+          <h3>Purchase invoice upload</h3>
+          <p>Clear PDF, JPG, PNG ya mobile camera photo use karein.</p>
+          <label className="invoice-drop">
+            <Upload />
+            <b>{file?.name || "Choose supplier invoice"}</b>
+            <small>PDF/JPG/PNG · maximum 5 pages read honge</small>
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={(e) => {
+                setFile(e.target.files[0]);
+                setScan(null);
+              }}
+            />
+          </label>
+          <button
+            className="btn primary full"
+            disabled={!file || busy}
+            onClick={scanFile}
+          >
+            <ScanLine />
+            {busy ? progress || "Reading…" : "Read invoice"}
+          </button>
+          <div className="scan-safety">
+            <b>Safe stock update</b>
+            <span>
+              Scan ke baad review zaroor hoga. Confirm se pehle stock change
+              nahi hoga.
+            </span>
+          </div>
+        </div>
+        {scan && (
+          <div className="card scan-review">
+            <div className="cardhead">
+              <div>
+                <h3>Review extracted details</h3>
+                <p>Galat text ko yahin edit karein.</p>
+              </div>
+              <Badge status="Review" />
+            </div>
+            <div className="scan-meta">
+              <Field label="Supplier name">
+                <input
+                  value={scan.supplier}
+                  onChange={(e) =>
+                    setScan({ ...scan, supplier: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Supplier invoice no.">
+                <input
+                  value={scan.invoice_no}
+                  onChange={(e) =>
+                    setScan({ ...scan, invoice_no: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Invoice date">
+                <input
+                  type="date"
+                  value={scan.invoice_date}
+                  onChange={(e) =>
+                    setScan({ ...scan, invoice_date: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Supplier GSTIN">
+                <input
+                  value={scan.gstin || ""}
+                  onChange={(e) => setScan({ ...scan, gstin: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="scan-rows">
+              {scan.rows.map((row, n) => (
+                <div className="scan-row" key={row.id}>
+                  <strong>#{n + 1}</strong>
+                  <Field label="Match existing / create new">
+                    <select
+                      value={row.product_id}
+                      onChange={(e) => {
+                        const p = s.products.find(
+                          (x) => x.id === e.target.value,
+                        );
+                        updateRow(row.id, {
+                          product_id: e.target.value,
+                          name: p?.name || row.name,
+                          buy_price: p?.purchase_price || row.buy_price,
+                          sale_price: p?.sale_price || row.sale_price,
+                        });
+                      }}
+                    >
+                      <option value="">+ Create new product</option>
+                      {s.products.map((p) => (
+                        <option value={p.id} key={p.id}>
+                          {p.name} · Stock {p.current_stock}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Product name">
+                    <input
+                      value={row.name}
+                      onChange={(e) =>
+                        updateRow(row.id, { name: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Qty">
+                    <input
+                      type="number"
+                      min="0.01"
+                      value={row.quantity}
+                      onChange={(e) =>
+                        updateRow(row.id, { quantity: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Buy price">
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.buy_price}
+                      onChange={(e) =>
+                        updateRow(row.id, { buy_price: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Sale price">
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.sale_price}
+                      onChange={(e) =>
+                        updateRow(row.id, { sale_price: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="GST %">
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.gst_rate}
+                      onChange={(e) =>
+                        updateRow(row.id, { gst_rate: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <button
+                    className="icon danger"
+                    title="Remove"
+                    onClick={() =>
+                      setScan({
+                        ...scan,
+                        rows: scan.rows.filter((x) => x.id !== row.id),
+                      })
+                    }
+                  >
+                    <Trash2 />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="scan-actions">
+              <button
+                className="btn secondary"
+                onClick={() =>
+                  setScan({
+                    ...scan,
+                    rows: [
+                      ...scan.rows,
+                      {
+                        id: uid(),
+                        name: "",
+                        quantity: 1,
+                        buy_price: 0,
+                        sale_price: 0,
+                        gst_rate: 0,
+                        unit: "Nos",
+                        product_id: "",
+                        create_new: true,
+                      },
+                    ],
+                  })
+                }
+              >
+                <Plus /> Add missing item
+              </button>
+              <button className="btn primary" disabled={busy} onClick={confirm}>
+                <CheckCircle2 />
+                {busy ? progress || "Saving…" : "Confirm & Add Stock"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Invoices({ s }) {
   const navg = useNavigate();
   return (
@@ -2729,6 +3245,10 @@ function ProtectedApp() {
           <Route path="/customers" element={<Customers s={s} />} />
           <Route path="/products" element={<Products s={s} />} />
           <Route path="/stock" element={<Stock s={s} />} />
+          <Route
+            path="/purchase-scan"
+            element={<PurchaseInvoiceScan s={s} />}
+          />
           <Route path="/invoices" element={<Invoices s={s} />} />
           <Route path="/invoices/new" element={<NewInvoice s={s} />} />
           <Route path="/invoices/:id/edit" element={<NewInvoice s={s} />} />
