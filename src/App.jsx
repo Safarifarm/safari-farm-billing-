@@ -2609,7 +2609,12 @@ function InvoicePaper({
         },
       ];
   if (!pageNumber) {
-    const pageSize = inv.pricing_mode === "Detailed Pricing" ? 8 : 10,
+    const pageSize =
+        inv.invoice_type === "Purchase/Stock Invoice"
+          ? 18
+          : inv.pricing_mode === "Detailed Pricing"
+            ? 8
+            : 10,
       pages = Array.from(
         { length: Math.max(1, Math.ceil(allItems.length / pageSize)) },
         (_, n) => allItems.slice(n * pageSize, (n + 1) * pageSize),
@@ -2630,7 +2635,12 @@ function InvoicePaper({
     );
   }
   const items = allItems;
-  const rowCapacity = inv.pricing_mode === "Detailed Pricing" ? 8 : 10;
+  const rowCapacity =
+    inv.invoice_type === "Purchase/Stock Invoice"
+      ? 18
+      : inv.pricing_mode === "Detailed Pricing"
+        ? 8
+        : 10;
   const rows = [
     ...items,
     ...Array(Math.max(0, rowCapacity - items.length)).fill(null),
@@ -2638,6 +2648,17 @@ function InvoicePaper({
   const valid = new Date(inv.invoice_date);
   valid.setDate(valid.getDate() + 14);
   const gst = inv.customer?.customer_type === "GST";
+  if (inv.invoice_type === "Purchase/Stock Invoice")
+    return (
+      <PurchaseStockPaper
+        inv={inv}
+        settings={f}
+        rows={rows}
+        pageNumber={pageNumber}
+        totalPages={totalPages}
+        startIndex={startIndex}
+      />
+    );
   return (
     <article
       className={`invoice-paper ref-style ${inv.pricing_mode === "Detailed Pricing" ? "detailed-invoice" : ""}`}
@@ -2991,6 +3012,155 @@ function InvoicePaper({
       <div className="page-count">
         Page {pageNumber} of {totalPages}
       </div>
+    </article>
+  );
+}
+function PurchaseStockPaper({
+  inv,
+  settings: f,
+  rows,
+  pageNumber,
+  totalPages,
+  startIndex,
+}) {
+  const quantity = rows.reduce(
+      (sum, item) => sum + Number(item?.quantity || 0),
+      0,
+    ),
+    invoiceDate = new Date(inv.invoice_date).toLocaleDateString("en-GB");
+  return (
+    <article className="invoice-paper stock-price-paper">
+      <div className="stock-watermark">
+        <img src={f.logo_url || "/safari-logo.png"} />
+      </div>
+      <header className="stock-sheet-header">
+        <img
+          className="stock-sheet-logo"
+          src={f.logo_url || "/safari-logo.png"}
+        />
+        <div className="stock-sheet-title">
+          <h1>{f.business_name || "SAFARI FARM & HATCHERY"}</h1>
+          <p>
+            GSTIN: <b>{f.gstin || "—"}</b>
+          </p>
+          <h2>PURCHASE STOCK & DETAILED PRICE SHEET</h2>
+        </div>
+        <div className="stock-sheet-meta">
+          <p>
+            <span>Stock Ref.</span>
+            <b>{inv.invoice_no || "—"}</b>
+          </p>
+          <p>
+            <span>Date</span>
+            <b>{invoiceDate}</b>
+          </p>
+          <p>
+            <span>Page</span>
+            <b>
+              {pageNumber} / {totalPages}
+            </b>
+          </p>
+        </div>
+      </header>
+
+      <div className="stock-summary-strip">
+        <span>
+          <b>{rows.filter(Boolean).length}</b> Product Lines
+        </span>
+        <span>
+          <b>{quantity.toLocaleString("en-IN")}</b> Stock Added
+        </span>
+        <span>
+          <b>{money(inv.buy_total || 0)}</b> Total Purchase
+        </span>
+        <span>
+          <b>{money(inv.selling_total || 0)}</b> Expected Retail
+        </span>
+      </div>
+
+      <table className="stock-price-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Image</th>
+            <th>Product Details</th>
+            <th>HSN/SAC</th>
+            <th>Stock</th>
+            <th>Unit</th>
+            <th>Buy</th>
+            <th>Stand</th>
+            <th>Retail</th>
+            <th>Wholesale</th>
+            <th>W/O Stand</th>
+            <th>GST</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((item, index) => (
+            <tr key={index}>
+              <td>{startIndex + index + 1}</td>
+              <td>
+                {item && (item.image_url || item.product?.image_url) ? (
+                  <img src={item.image_url || item.product?.image_url} />
+                ) : null}
+              </td>
+              <td>{item?.description || ""}</td>
+              <td>{item?.hsn || ""}</td>
+              <td>{item?.quantity || ""}</td>
+              <td>{item?.unit || ""}</td>
+              <td>{item ? Number(item.purchase_rate || 0).toFixed(2) : ""}</td>
+              <td>
+                {item
+                  ? Number(item.stand_rate || item.extra_rate || 0).toFixed(2)
+                  : ""}
+              </td>
+              <td>
+                {item
+                  ? Number(item.selling_rate || item.rate || 0).toFixed(2)
+                  : ""}
+              </td>
+              <td>{item ? Number(item.discount_rate || 0).toFixed(2) : ""}</td>
+              <td>
+                {item ? Number(item.without_stand_rate || 0).toFixed(2) : ""}
+              </td>
+              <td>{item ? `${Number(item.gst_rate || 0)}%` : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <section className="stock-price-totals">
+        <div>
+          <span>Buy Total</span>
+          <b>{money(inv.buy_total || 0)}</b>
+        </div>
+        <div>
+          <span>Stand Total</span>
+          <b>{money(inv.stand_total || 0)}</b>
+        </div>
+        <div>
+          <span>Retail Total</span>
+          <b>{money(inv.selling_total || 0)}</b>
+        </div>
+        <div>
+          <span>Wholesale Total</span>
+          <b>{money(inv.discount_total || 0)}</b>
+        </div>
+        <div>
+          <span>Without-Stand Total</span>
+          <b>{money(inv.without_stand_total || 0)}</b>
+        </div>
+        <div className="stock-profit">
+          <span>Expected Retail Profit</span>
+          <b>{money(inv.profit_total || 0)}</b>
+        </div>
+      </section>
+
+      <footer className="stock-sheet-footer">
+        <span>{f.business_name || "Safari Farm & Hatchery"}</span>
+        <span>GSTIN: {f.gstin || "—"}</span>
+        <span>Internal Stock & Price Record</span>
+      </footer>
     </article>
   );
 }

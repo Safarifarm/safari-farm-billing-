@@ -2013,6 +2013,226 @@ td small {
   break-after: auto;
   page-break-after: auto;
 }
+.stock-price-paper {
+  height: 297mm;
+  min-height: 297mm;
+  padding: 6mm 7mm;
+  border: 0.45mm solid #c79319;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+}
+.stock-watermark {
+  position: absolute;
+  inset: 67mm 44mm auto;
+  opacity: 0.045;
+  pointer-events: none;
+}
+.stock-watermark img {
+  width: 100%;
+  height: auto;
+}
+.stock-sheet-header {
+  min-height: 34mm;
+  display: grid;
+  grid-template-columns: 31mm 1fr 46mm;
+  align-items: center;
+  gap: 4mm;
+  border-bottom: 1.2mm solid #154b32;
+  padding-bottom: 2.5mm;
+  position: relative;
+  z-index: 1;
+}
+.stock-sheet-logo {
+  width: 29mm;
+  height: 29mm;
+  object-fit: contain;
+}
+.stock-sheet-title {
+  text-align: center;
+}
+.stock-sheet-title h1 {
+  margin: 0;
+  color: #12472e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+}
+.stock-sheet-title p {
+  margin: 1.4mm 0;
+  font-size: 9px;
+  color: #364d40;
+}
+.stock-sheet-title h2 {
+  display: inline-block;
+  margin: 0;
+  padding: 1.4mm 4mm;
+  border-radius: 1mm;
+  background: #154b32;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+}
+.stock-sheet-meta {
+  border: 0.35mm solid #2f6848;
+  border-radius: 1.5mm;
+  overflow: hidden;
+}
+.stock-sheet-meta p {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1mm;
+  margin: 0;
+  padding: 1.5mm 2mm;
+  border-bottom: 0.2mm solid #aab9af;
+  font-size: 7.5px;
+}
+.stock-sheet-meta p:last-child {
+  border-bottom: 0;
+}
+.stock-sheet-meta b {
+  text-align: right;
+}
+.stock-summary-strip {
+  min-height: 11mm;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  gap: 1.5mm;
+  padding: 2mm 0;
+  position: relative;
+  z-index: 1;
+}
+.stock-summary-strip span {
+  padding: 1.5mm;
+  border: 0.25mm solid #b8c4bc;
+  border-radius: 1mm;
+  background: #f5f8f5;
+  color: #42554a;
+  font-size: 7.5px;
+  text-align: center;
+}
+.stock-summary-strip b {
+  display: block;
+  color: #153f2b;
+  font-size: 9px;
+}
+.stock-price-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  position: relative;
+  z-index: 1;
+}
+.stock-price-table th {
+  height: 8mm;
+  padding: 0.6mm 0.35mm;
+  border: 0.25mm solid #718277;
+  background: #123f2b;
+  color: white;
+  font-size: 6.6px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+.stock-price-table td {
+  height: 9.5mm;
+  padding: 0.45mm 0.35mm;
+  border: 0.22mm solid #9aa89f;
+  color: #17271e;
+  font-size: 7px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: center;
+  overflow: hidden;
+}
+.stock-price-table tbody tr:nth-child(even) td {
+  background: #f4f7f4cc;
+}
+.stock-price-table td:nth-child(3) {
+  padding-left: 1mm;
+  text-align: left;
+  font-size: 7.4px;
+}
+.stock-price-table th:nth-child(1) {
+  width: 5%;
+}
+.stock-price-table th:nth-child(2) {
+  width: 6%;
+}
+.stock-price-table th:nth-child(3) {
+  width: 21%;
+}
+.stock-price-table th:nth-child(4) {
+  width: 8%;
+}
+.stock-price-table th:nth-child(5) {
+  width: 6%;
+}
+.stock-price-table th:nth-child(6) {
+  width: 6%;
+}
+.stock-price-table th:nth-child(7),
+.stock-price-table th:nth-child(8),
+.stock-price-table th:nth-child(9),
+.stock-price-table th:nth-child(10),
+.stock-price-table th:nth-child(11) {
+  width: 8%;
+}
+.stock-price-table th:nth-child(12) {
+  width: 6%;
+}
+.stock-price-table img {
+  width: 7mm;
+  height: 7mm;
+  object-fit: contain;
+  display: block;
+  margin: auto;
+}
+.stock-price-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.2mm;
+  margin-top: 2.5mm;
+  position: relative;
+  z-index: 1;
+}
+.stock-price-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  padding: 1.5mm 2mm;
+  border: 0.3mm solid #708378;
+  border-radius: 1mm;
+  background: white;
+  font-size: 7.5px;
+}
+.stock-price-totals b {
+  color: #154b32;
+}
+.stock-price-totals .stock-profit {
+  background: #efac18;
+  border-color: #cc8b00;
+}
+.stock-sheet-footer {
+  min-height: 7mm;
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 3mm;
+  padding: 1.5mm 3mm;
+  border-radius: 1.5mm;
+  background: #154b32;
+  color: white;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.15px;
+  position: relative;
+  z-index: 1;
+}
 .logout-btn {
   margin-left: 0 !important;
 }
