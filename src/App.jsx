@@ -299,7 +299,22 @@ function useStore() {
     setCustomers((a) => a.filter((x) => x.id !== id));
   };
   const saveProduct = async (v) => {
-    const payload = { ...v, sort_order: v.sort_order ?? products.length };
+    const safeNumber = (value, fallback = 0) => {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+      },
+      payload = {
+        ...v,
+        purchase_price: safeNumber(v.purchase_price),
+        sale_price: safeNumber(v.sale_price),
+        extra_price: safeNumber(v.extra_price),
+        discount_price: safeNumber(v.discount_price),
+        without_stand_price: safeNumber(v.without_stand_price),
+        gst_rate: safeNumber(v.gst_rate),
+        current_stock: safeNumber(v.current_stock),
+        low_stock_threshold: safeNumber(v.low_stock_threshold),
+        sort_order: safeNumber(v.sort_order, products.length),
+      };
     if (supabase) {
       const { data, error } = await supabase
         .from("sfh_products")
@@ -3147,14 +3162,14 @@ function ProductModal({ value, close, save, upload }) {
         name: v.name.trim(),
         sku: v.sku?.trim() || `SFH-${Date.now().toString().slice(-8)}`,
         image_url,
-        purchase_price: +v.purchase_price,
-        sale_price: +v.sale_price,
-        extra_price: +v.extra_price,
-        discount_price: +v.discount_price,
-        without_stand_price: +v.without_stand_price,
-        gst_rate: +v.gst_rate,
-        current_stock: +v.current_stock,
-        low_stock_threshold: +v.low_stock_threshold,
+        purchase_price: Number(v.purchase_price || 0),
+        sale_price: Number(v.sale_price || 0),
+        extra_price: Number(v.extra_price || 0),
+        discount_price: Number(v.discount_price || 0),
+        without_stand_price: Number(v.without_stand_price || 0),
+        gst_rate: Number(v.gst_rate || 0),
+        current_stock: Number(v.current_stock || 0),
+        low_stock_threshold: Number(v.low_stock_threshold || 0),
       });
     } catch (error) {
       alert(
